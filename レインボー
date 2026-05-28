@@ -1,0 +1,479 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local Player = Players.LocalPlayer
+
+-- 古いUIがあれば削除
+local existingUI = Player:WaitForChild("PlayerGui"):FindFirstChild("SmileHubOrionCustom")
+if existingUI then existingUI:Destroy() end
+
+-- ==========================================================
+-- 🌌 1. 画面ベース・ウィンドウ構築（Orion風デザイン）
+-- ==========================================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "SmileHubOrionCustom"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = Player:WaitForChild("PlayerGui")
+
+-- メインウィンドウ枠
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 450, 0, 350)
+MainFrame.Position = UDim2.new(0.5, -225, 0.5, -175)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true -- 簡易ドラッグ有効化
+MainFrame.Parent = ScreenGui
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 8)
+MainCorner.Parent = MainFrame
+
+-- 🌈 頂部レインボーグラデーションバー
+local RainbowBar = Instance.new("Frame")
+RainbowBar.Name = "RainbowBar"
+RainbowBar.Size = UDim2.new(1, 0, 0, 4)
+RainbowBar.Position = UDim2.new(0, 0, 0, 0)
+RainbowBar.BorderSizePixel = 0
+RainbowBar.Parent = MainFrame
+
+local BarCorner = Instance.new("UICorner")
+BarCorner.CornerRadius = UDim.new(0, 8)
+BarCorner.Parent = RainbowBar
+
+local UIGradient = Instance.new("UIGradient")
+UIGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+    ColorSequenceKeypoint.new(0.2, Color3.fromRGB(255, 255, 0)),
+    ColorSequenceKeypoint.new(0.4, Color3.fromRGB(0, 255, 0)),
+    ColorSequenceKeypoint.new(0.6, Color3.fromRGB(0, 255, 255)),
+    ColorSequenceKeypoint.new(0.8, Color3.fromRGB(0, 0, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 255))
+})
+UIGradient.Parent = RainbowBar
+
+-- レインボーアニメーション
+task.spawn(function()
+    while MainFrame.Parent do
+        for offset = 0, 100 do
+            UIGradient.Offset = Vector2.new(-offset / 100, 0)
+            task.wait(0.02)
+        end
+    end
+end)
+
+-- タイトル
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Size = UDim2.new(1, -20, 0, 30)
+TitleLabel.Position = UDim2.new(0, 15, 0, 10)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = "🙂 smilehubv0.1"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.TextSize = 14
+TitleLabel.Parent = MainFrame
+
+-- コンテンツスクロール領域（一画面完結・直列マウント用）
+local Container = Instance.new("ScrollingFrame")
+Container.Size = UDim2.new(1, -20, 1, -50)
+Container.Position = UDim2.new(0, 10, 0, 45)
+Container.BackgroundTransparency = 1
+Container.BorderSizePixel = 0
+Container.ScrollBarThickness = 4
+Container.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80)
+Container.Parent = MainFrame
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 6)
+UIListLayout.Parent = Container
+
+UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    Container.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y + 10)
+end)
+
+-- ==========================================================
+-- 🛠️ 2. Orion風パーツ生成関数（自作）
+-- ==========================================================
+local UI = {}
+
+-- セクション
+function UI:AddSection(text)
+    local SectionFrame = Instance.new("Frame")
+    SectionFrame.Size = UDim2.new(1, 0, 0, 25)
+    SectionFrame.BackgroundTransparency = 1
+    SectionFrame.Parent = Container
+
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(1, 0, 1, 0)
+    Label.BackgroundTransparency = 1
+    Label.Text = text
+    Label.TextColor3 = Color3.fromRGB(180, 180, 180)
+    Label.Font = Enum.Font.GothamBold
+    Label.TextSize = 11
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = SectionFrame
+end
+
+-- ボタン
+function UI:AddButton(text, callback)
+    local Button = Instance.new("TextButton")
+    Button.Size = UDim2.new(1, 0, 0, 32)
+    Button.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    Button.BorderSizePixel = 0
+    Button.Text = "  " .. text
+    Button.TextColor3 = Color3.fromRGB(230, 230, 230)
+    Button.Font = Enum.Font.Gotham
+    Button.TextSize = 13
+    Button.TextXAlignment = Enum.TextXAlignment.Left
+    Button.Parent = Container
+
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 5)
+    Corner.Parent = Button
+
+    Button.MouseButton1Click:Connect(callback)
+end
+
+-- トグル
+function UI:AddToggle(text, callback)
+    local ToggleFrame = Instance.new("Frame")
+    ToggleFrame.Size = UDim2.new(1, 0, 0, 35)
+    ToggleFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    ToggleFrame.BorderSizePixel = 0
+    ToggleFrame.Parent = Container
+
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 5)
+    Corner.Parent = ToggleFrame
+
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(1, -60, 1, 0)
+    Label.Position = UDim2.new(0, 12, 0, 0)
+    Label.BackgroundTransparency = 1
+    Label.Text = text
+    Label.TextColor3 = Color3.fromRGB(230, 230, 230)
+    Label.Font = Enum.Font.Gotham
+    Label.TextSize = 13
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = ToggleFrame
+
+    local Switch = Instance.new("TextButton")
+    Switch.Size = UDim2.new(0, 40, 0, 20)
+    Switch.Position = UDim2.new(1, -52, 0.5, -10)
+    Switch.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    Switch.Text = ""
+    Switch.Parent = ToggleFrame
+
+    local SwitchCorner = Instance.new("UICorner")
+    SwitchCorner.CornerRadius = UDim.new(1, 0)
+    SwitchCorner.Parent = Switch
+
+    local Indicator = Instance.new("Frame")
+    Indicator.Size = UDim2.new(0, 16, 0, 16)
+    Indicator.Position = UDim2.new(0, 2, 0.5, -8)
+    Indicator.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    Indicator.Parent = Switch
+
+    local IndCorner = Instance.new("UICorner")
+    IndCorner.CornerRadius = UDim.new(1, 0)
+    IndCorner.Parent = Indicator
+
+    local state = false
+    Switch.MouseButton1Click:Connect(function()
+        state = not state
+        if state then
+            TweenService:Create(Switch, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 200, 100)}):Play()
+            TweenService:Create(Indicator, TweenInfo.new(0.2), {Position = UDim2.new(1, -18, 0.5, -8)}):Play()
+        else
+            TweenService:Create(Switch, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(50, 50, 50)}):Play()
+            TweenService:Create(Indicator, TweenInfo.new(0.2), {Position = UDim2.new(0, 2, 0.5, -8)}):Play()
+        end
+        callback(state)
+    end)
+end
+
+-- ドロップダウン
+function UI:AddDropdown(text, options, callback)
+    local DropFrame = Instance.new("Frame")
+    DropFrame.Size = UDim2.new(1, 0, 0, 35)
+    DropFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    DropFrame.BorderSizePixel = 0
+    DropFrame.ClipsDescendants = true
+    DropFrame.Parent = Container
+
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 5)
+    Corner.Parent = DropFrame
+
+    local Trigger = Instance.new("TextButton")
+    Trigger.Size = UDim2.new(1, 0, 0, 35)
+    Trigger.BackgroundTransparency = 1
+    Trigger.Text = "  " .. text .. " : [ None ]"
+    Trigger.TextColor3 = Color3.fromRGB(230, 230, 230)
+    Trigger.Font = Enum.Font.Gotham
+    Trigger.TextSize = 13
+    Trigger.TextXAlignment = Enum.TextXAlignment.Left
+    Trigger.Parent = DropFrame
+
+    local ItemContainer = Instance.new("Frame")
+    ItemContainer.Size = UDim2.new(1, 0, 1, -35)
+    ItemContainer.Position = UDim2.new(0, 0, 0, 35)
+    ItemContainer.BackgroundTransparency = 1
+    ItemContainer.Parent = DropFrame
+
+    local ItemList = Instance.new("UIListLayout")
+    ItemList.SortOrder = Enum.SortOrder.LayoutOrder
+    ItemList.Parent = ItemContainer
+
+    local open = false
+    
+    local function refreshOptions(newOptions)
+        for _, child in ipairs(ItemContainer:GetChildren()) do
+            if child:IsA("TextButton") then child:Destroy() end
+        end
+        
+        for _, opt in ipairs(newOptions) do
+            local OptBtn = Instance.new("TextButton")
+            OptBtn.Size = UDim2.new(1, 0, 0, 28)
+            OptBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+            OptBtn.BorderSizePixel = 0
+            OptBtn.Text = "    " .. opt
+            OptBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+            OptBtn.Font = Enum.Font.Gotham
+            OptBtn.TextSize = 12
+            OptBtn.TextXAlignment = Enum.TextXAlignment.Left
+            OptBtn.Parent = ItemContainer
+
+            OptBtn.MouseButton1Click:Connect(function()
+                Trigger.Text = "  " .. text .. " : [ " .. opt .. " ]"
+                open = false
+                TweenService:Create(DropFrame, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, 35)}):Play()
+                callback(opt)
+            end)
+        end
+    end
+
+    Trigger.MouseButton1Click:Connect(function()
+        open = not open
+        if open then
+            local targetHeight = 35 + (ItemList.AbsoluteContentSize.Y)
+            TweenService:Create(DropFrame, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, targetHeight)}):Play()
+        else
+            TweenService:Create(DropFrame, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, 35)}):Play()
+        end
+    end)
+
+    refreshOptions(options)
+
+    return {
+        Refresh = function(_, nextOpts, reset)
+            if reset then Trigger.Text = "  " .. text .. " : [ None ]" end
+            refreshOptions(nextOpts)
+        end
+    }
+end
+
+-- スライダー
+function UI:AddSlider(text, min, max, default, callback)
+    local SliderFrame = Instance.new("Frame")
+    SliderFrame.Size = UDim2.new(1, 0, 0, 45)
+    SliderFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    SliderFrame.BorderSizePixel = 0
+    SliderFrame.Parent = Container
+
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 5)
+    Corner.Parent = SliderFrame
+
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(1, -20, 0, 20)
+    Label.Position = UDim2.new(0, 12, 0, 4)
+    Label.BackgroundTransparency = 1
+    Label.Text = text .. " : " .. tostring(default)
+    Label.TextColor3 = Color3.fromRGB(230, 230, 230)
+    Label.Font = Enum.Font.Gotham
+    Label.TextSize = 12
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = SliderFrame
+
+    local Track = Instance.new("Frame")
+    Track.Size = UDim2.new(1, -24, 0, 5)
+    Track.Position = UDim2.new(0, 12, 0, 30)
+    Track.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    Track.BorderSizePixel = 0
+    Track.Parent = SliderFrame
+
+    local TrackCorner = Instance.new("UICorner")
+    TrackCorner.CornerRadius = UDim.new(1, 0)
+    TrackCorner.Parent = Track
+
+    local Fill = Instance.new("Frame")
+    Fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+    Fill.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    Fill.BorderSizePixel = 0
+    Fill.Parent = Track
+
+    local FillCorner = Instance.new("UICorner")
+    FillCorner.CornerRadius = UDim.new(1, 0)
+    FillCorner.Parent = Fill
+
+    -- スライダーのドラッグロジック
+    local dragging = false
+    local function update(input)
+        local percentage = math.clamp((input.Position.X - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1)
+        Fill.Size = UDim2.new(percentage, 0, 1, 0)
+        local value = math.floor(min + ((max - min) * percentage))
+        Label.Text = text .. " : " .. tostring(value)
+        callback(value)
+    end
+
+    Track.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            update(input)
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            update(input)
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+end
+
+-- ==========================================================
+-- 🎯 3. 機能マウント (smilehub コアロジック)
+-- ==========================================================
+
+-- 🎯 TARGET EXECUTION
+UI:AddSection("🎯 TARGET EXECUTION")
+
+local selectedTargetPlayer = nil
+local loopKickActive = false
+local loopKickConnection = nil
+
+local function getPlayerNames()
+    local list = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= Player then
+            table.insert(list, p.DisplayName .. " (" .. p.Name .. ")")
+        end
+    end
+    return list
+end
+
+local function getPlayerFromFormat(val)
+    if not val then return nil end
+    local uName = val:match("%((.-)%)")
+    return uName and Players:FindFirstChild(uName) or nil
+end
+
+local TargetDropdown
+TargetDropdown = UI:AddDropdown("Select Bad Player", getPlayerNames(), function(Value)
+    selectedTargetPlayer = getPlayerFromFormat(Value)
+end)
+
+UI:AddButton("🔄 Refresh Player List", function()
+    TargetDropdown:Refresh(getPlayerNames(), true)
+    selectedTargetPlayer = nil
+end)
+
+UI:AddToggle("⚡ Loop Kick (Network Owner Spam)", function(Value)
+    loopKickActive = Value
+    if Value then
+        if not selectedTargetPlayer then return end
+        if loopKickConnection then loopKickConnection:Disconnect() end
+        loopKickConnection = RunService.Heartbeat:Connect(function()
+            if not loopKickActive or not selectedTargetPlayer then 
+                if loopKickConnection then loopKickConnection:Disconnect() loopKickConnection = nil end
+                return 
+            end
+            
+            pcall(function()
+                local tChar = selectedTargetPlayer.Character
+                local tHrp = tChar and tChar:FindFirstChild("HumanoidRootPart")
+                local myHrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+                
+                if tHrp and myHrp then
+                    ReplicatedStorage.GrabEvents.SetNetworkOwner:FireServer(tHrp, myHrp.CFrame)
+                    tHrp.CFrame = tHrp.CFrame + Vector3.new(0, 80, 0)
+                end
+            end)
+        end)
+    else
+        if loopKickConnection then loopKickConnection:Disconnect() loopKickConnection = nil end
+    end
+end)
+
+-- 🛡️ SMILEHUB DEFENSES
+UI:AddSection("🛡️ SMILEHUB DEFENSES")
+
+local autoStruggleConn = nil
+UI:AddToggle("🔰 Anti Grab & Struggle", function(Value)
+    if Value then
+        if autoStruggleConn then autoStruggleConn:Disconnect() end
+        autoStruggleConn = RunService.Heartbeat:Connect(function()
+            local character = Player.Character
+            if character and character:FindFirstChild("Head") and character.Head:FindFirstChild("PartOwner") then
+                task.spawn(function()
+                    local Struggle = ReplicatedStorage:FindFirstChild("CharacterEvents") and ReplicatedStorage.CharacterEvents:FindFirstChild("Struggle")
+                    if Struggle then Struggle:FireServer(Player) end
+                    pcall(function() ReplicatedStorage.GameCorrectionEvents.StopAllVelocity:FireServer() end)
+                    for _, part in pairs(character:GetChildren()) do if part:IsA("BasePart") then part.Anchored = true end end
+                    local isHeld = Player:FindFirstChild("IsHeld")
+                    while isHeld and isHeld.Value do task.wait() end
+                    for _, part in pairs(character:GetChildren()) do if part:IsA("BasePart") then part.Anchored = false end end
+                end)
+            end
+        end)
+    else
+        if autoStruggleConn then autoStruggleConn:Disconnect() autoStruggleConn = nil end
+    end
+end)
+
+UI:AddToggle("🛠️ Anti Input Lag", function(Value)
+    _G.AntiInputLag = Value
+    if Value then
+        task.spawn(function()
+            local ToyName = "FoodHamburger"
+            while _G.AntiInputLag do
+                local char = Player.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    local toysFolder = workspace:FindFirstChild(Player.Name.."SpawnedInToys")
+                    local burger = toysFolder and toysFolder:FindFirstChild(ToyName)
+                    if not burger then
+                        pcall(function() ReplicatedStorage.MenuToys.SpawnToyRemoteFunction:InvokeServer(ToyName, hrp.CFrame * CFrame.new(0, 5, 0), Vector3.new(0,0,0)) end)
+                        task.wait(0.15)
+                    end
+                    if burger and burger:FindFirstChild("HoldPart") then
+                        pcall(function() burger.HoldPart.HoldItemRemoteFunction:InvokeServer(burger, char) end)
+                        task.wait()
+                        pcall(function() ReplicatedStorage.GrabEvents.DestroyGrabLine:FireServer(burger) end)
+                    end
+                end
+                task.wait(0.1)
+            end
+        end)
+    end
+end)
+
+-- 🏃 UTILITIES
+UI:AddSection("🏃 UTILITIES")
+
+UI:AddSlider("Custom WalkSpeed", 16, 250, 16, function(Value)
+    local hum = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
+    if hum then hum.WalkSpeed = Value end
+end)
